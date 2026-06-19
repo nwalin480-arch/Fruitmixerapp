@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Fruit Mixer</string>
+    <string name="privacy_title">We value your privacy</string>
+    <string name="privacy_agree">AGREE</string>
+    <string name="privacy_more">MORE OPTIONS</string>
 </resources>

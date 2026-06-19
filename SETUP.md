@@ -1,95 +1,89 @@
-# Fruit Mixer — GitHub + Amazon Appstore Setup Guide
+# Fruit Mixer — GitHub + Amazon Appstore Setup (Phone Only, No PC Needed)
+
+---
 
 ## Step 1: Create your GitHub repository
 
-1. Go to https://github.com/new
-2. Name it `fruit-mixer` (or anything you like)
-3. Set it to **Private** (recommended)
-4. Do NOT initialize with README (we already have one)
-5. Click **Create repository**
+1. Open https://github.com/new on your phone
+2. Name it `fruit-mixer`
+3. Set to **Private**
+4. Do NOT tick "Add README"
+5. Tap **Create repository**
+
+---
 
 ## Step 2: Push this project to GitHub
 
-Open a terminal and run:
+Since you're on Replit (no PC), do this in the Replit Shell tab:
 
 ```bash
-git init
-git add .
-git commit -m "Fruit Mixer Android – AdMob wired in"
 git remote add origin https://github.com/YOUR_USERNAME/fruit-mixer.git
 git push -u origin main
 ```
 
-Replace `YOUR_USERNAME` with your GitHub username.
+When asked for a password, use a **GitHub Personal Access Token** (not your account password):
+- GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token
+- Select scope: `repo`
+- Copy the token and paste it as your password
 
 ---
 
-## Step 3: Create your signing keystore (do this ONCE on your PC)
+## Step 3: Generate your signing keystore (no PC needed)
 
-GitHub does NOT sign your APK automatically — you need your own keystore.
-This keystore is your developer identity. **Keep it safe forever.**
+Your keystore is your permanent developer identity — it proves updates to your app come from you.
+**GitHub Actions will generate it for you.**
 
-Run this command on your computer (you need Java installed):
-
-```bash
-keytool -genkeypair -v \
-  -keystore fruit-mixer-release.keystore \
-  -alias fruit-mixer-key \
-  -keyalg RSA \
-  -keysize 2048 \
-  -validity 10000 \
-  -storepass YOUR_STORE_PASSWORD \
-  -keypass YOUR_KEY_PASSWORD \
-  -dname "CN=Rock City, OU=Games, O=Rock City, L=City, S=State, C=US"
-```
-
-Replace `YOUR_STORE_PASSWORD` and `YOUR_KEY_PASSWORD` with strong passwords you choose.
+1. Go to your GitHub repo → **Actions** tab
+2. Click **"🔑 Generate Keystore (Run Once)"** workflow
+3. Click **"Run workflow"** (top right)
+4. Fill in:
+   - **Store password** — choose a strong password (write it down!)
+   - **Key password** — can be the same password
+   - **Developer name** — `Rock City` (or your name)
+5. Click the green **Run workflow** button
+6. Wait ~1 minute, then click the finished run
+7. Download the **keystore-files** artifact
+8. Open `keystore-base64.txt` — copy ALL the text inside
 
 ---
 
-## Step 4: Add your keystore to GitHub Secrets
+## Step 4: Add secrets to GitHub (so your APK gets signed)
 
-1. Convert your keystore to base64:
-   ```bash
-   base64 -w 0 fruit-mixer-release.keystore
-   ```
-   This prints a long string of letters — copy it all.
+Go to your repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
-2. Go to your GitHub repo → **Settings** → **Secrets and variables** → **Actions**
+Add these 4 secrets one by one:
 
-3. Add these 4 secrets (click "New repository secret" for each):
-
-   | Secret Name        | Value                              |
-   |--------------------|------------------------------------|
-   | `KEYSTORE_BASE64`  | The long base64 string from step 1 |
-   | `KEYSTORE_PASSWORD`| Your store password                |
-   | `KEY_ALIAS`        | `fruit-mixer-key`                  |
-   | `KEY_PASSWORD`     | Your key password                  |
+| Secret Name         | Value                                        |
+|---------------------|----------------------------------------------|
+| `KEYSTORE_BASE64`   | Everything you copied from keystore-base64.txt |
+| `KEYSTORE_PASSWORD` | The store password you chose in Step 3       |
+| `KEY_ALIAS`         | `fruit-mixer-key`                            |
+| `KEY_PASSWORD`      | The key password you chose in Step 3        |
 
 ---
 
-## Step 5: Build your APK
+## Step 5: Build your signed APK
 
-1. Push any change to the `main` branch (or go to **Actions** tab and click **Run workflow**)
-2. Wait ~5 minutes for the build to finish
-3. Click the completed workflow run
-4. Download **FruitMixer-Amazon-Release** from the Artifacts section
-5. You get a signed `FruitMixer-release.apk` ready for Amazon
+1. Go to **Actions** tab → **"Build & Sign APK (Amazon Appstore)"**
+2. Click **Run workflow** → **Run workflow**
+3. Wait ~5 minutes
+4. Download **FruitMixer-Amazon-Release** artifact
+5. You get `FruitMixer-release.apk` — ready to upload to Amazon
 
 ---
 
 ## Step 6: Submit to Amazon Appstore
 
 1. Go to https://developer.amazon.com/apps-and-games
-2. Create a new app → Android
-3. Upload your `FruitMixer-release.apk`
-4. Fill in your privacy policy URL: **https://lin480-arch.github.io**
+2. Create new app → Android
+3. Upload `FruitMixer-release.apk`
+4. In the Privacy Policy field, enter: **https://lin480-arch.github.io**
 5. Submit for review
 
 ---
 
-## Important notes
+## Important — Keep your keystore safe!
 
-- **Never share your keystore or passwords** — losing them means you can never update the app
-- Amazon Appstore accepts APK files directly (unlike Google Play which prefers AAB)
-- Your privacy policy at `https://lin480-arch.github.io` is already referenced inside the app
+- Download and save `fruit-mixer-release.keystore` from the artifact somewhere safe (Google Drive, email to yourself)
+- If you lose it, you can never update the app on Amazon — you'd have to publish a brand new app
+- The keystore-files artifact only stays for 1 day, so save it quickly!
