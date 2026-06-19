@@ -17,17 +17,12 @@ var _gameEmitter     = _makeEmitter();
 var _platformEmitter = _makeEmitter();
 var _advEmitter      = _makeEmitter();
 
-/* ── Audio mute/unmute via Unity's AudioContext ─────────────────────────────
-   Unity WebGL exposes its AudioContext through unityInstance.Module.
-   We suspend it during ads so game audio doesn't play over ad audio,
-   then resume it once the ad is done. */
 function _muteAudio() {
     try {
         var ctx = window.unityInstance && window.unityInstance.Module &&
                   (window.unityInstance.Module.ctx || window.unityInstance.Module.audioContext);
         if (ctx && ctx.state !== 'suspended') ctx.suspend();
     } catch(e) {}
-    /* Fallback: mute any HTML audio/video elements */
     try {
         document.querySelectorAll('audio, video').forEach(function(el) { el.muted = true; });
     } catch(e) {}
@@ -39,17 +34,17 @@ function _unmuteAudio() {
                   (window.unityInstance.Module.ctx || window.unityInstance.Module.audioContext);
         if (ctx && ctx.state === 'suspended') ctx.resume();
     } catch(e) {}
-    /* Fallback: unmute any HTML audio/video elements */
     try {
         document.querySelectorAll('audio, video').forEach(function(el) { el.muted = false; });
     } catch(e) {}
 }
 
-function _pauseGame()  {
+function _pauseGame() {
     if (!window._unityReady) return;
     _gameEmitter.emit('visibility_state_changed', 'hidden');
     _platformEmitter.emit('pause_state_changed', true);
 }
+
 function _resumeGame() {
     if (!window._unityReady) return;
     _gameEmitter.emit('visibility_state_changed', 'visible');
@@ -61,43 +56,91 @@ document.addEventListener('visibilitychange', function() {
     else                 { _resumeGame(); _unmuteAudio(); }
 });
 
+/* ── Native Android bridge callbacks (called by native shell) ───────────────
+   The Android WebView calls these functions after ad events complete.        */
+
+window.onInterstitialAdLoaded = function() {
+    window.bridge.advertisement.interstitialState = 'loaded';
+    _advEmitter.emit('interstitial_state_changed', 'loaded');
+};
+
+window.onInterstitialAdClosed = function() {
+    window.bridge.advertisement.interstitialState = 'closed';
+    _advEmitter.emit('interstitial_state_changed', 'closed');
+    _resumeGame();
+    _unmuteAudio();
+};
+
+window.onInterstitialAdFailed = function() {
+    window.bridge.advertisement.interstitialState = 'failed';
+    _advEmitter.emit('interstitial_state_changed', 'failed');
+    _resumeGame();
+    _unmuteAudio();
+};
+
+window.onRewardedAdLoaded = function() {
+    window.bridge.advertisement.rewardedState = 'loaded';
+    _advEmitter.emit('rewarded_state_changed', 'loaded');
+};
+
+window.onRewardedAdRewarded = function() {
+    window.bridge.advertisement.rewardedState = 'rewarded';
+    _advEmitter.emit('rewarded_state_changed', 'rewarded');
+};
+
+window.onRewardedAdClosed = function() {
+    window.bridge.advertisement.rewardedState = 'closed';
+    _advEmitter.emit('rewarded_state_changed', 'closed');
+    _resumeGame();
+    _unmuteAudio();
+};
+
+window.onRewardedAdFailed = function() {
+    window.bridge.advertisement.rewardedState = 'failed';
+    _advEmitter.emit('rewarded_state_changed', 'failed');
+    _resumeGame();
+    _unmuteAudio();
+};
+
+/* ── Helper: safely call a method on the native Android interface ───────── */
+function _callNative(method, arg) {
+    try {
+        if (window.AndroidBridge && typeof window.AndroidBridge[method] === 'function') {
+            arg !== undefined ? window.AndroidBridge[method](arg) : window.AndroidBridge[method]();
+            return true;
+        }
+    } catch(e) {
+        console.warn('[AndroidBridge] call failed:', method, e);
+    }
+    return false;
+}
+
 window.bridge = {
     game: {
         setLoadingProgress: function(percentage) {
-            if (window.GamePix && typeof GamePix.loading === 'function') {
-                GamePix.loading(Math.floor(percentage));
-            }
+            _callNative('onLoadingProgress', Math.floor(percentage));
         },
         on: function(event, callback) {
             _gameEmitter.on(event, callback);
         },
         gameOver: function(score, level) {
-            if (window.GamePix) {
-                if (typeof score === 'number') GamePix.updateScore(score);
-                if (typeof level === 'number') GamePix.updateLevel(level);
-                GamePix.happyMoment();
-                window.bridge.advertisement.showInterstitial();
-            }
+            _callNative('onGameOver', JSON.stringify({ score: score, level: level }));
+            window.bridge.advertisement.showInterstitial();
         },
         levelComplete: function(score, level) {
-            if (window.GamePix) {
-                if (typeof score === 'number') GamePix.updateScore(score);
-                if (typeof level === 'number') GamePix.updateLevel(level);
-                GamePix.happyMoment();
-                window.bridge.advertisement.showInterstitial();
-            }
+            _callNative('onLevelComplete', JSON.stringify({ score: score, level: level }));
+            window.bridge.advertisement.showInterstitial();
         }
     },
     engine: 'unity',
     initialize: function() {
-        console.log("GamePix Adapter Initialized");
+        console.log('[AndroidBridge] Initialized');
+        _callNative('onGameReady');
         return Promise.resolve();
     },
     advertisement: {
         interstitialState: 'closed',
         rewardedState: 'closed',
-        advancedBannersState: 'closed',
-        rewardedPlacement: '',
         minimumDelayBetweenInterstitial: 60,
         isBannerSupported: false,
         isInterstitialSupported: true,
@@ -117,58 +160,34 @@ window.bridge = {
         showAdvancedBanners: function() {},
         hideAdvancedBanners: function() {},
         showInterstitial: function() {
-            if (!window.GamePix) return;
-            console.log("GamePix Adapter: Requesting Interstitial");
-            /* Pause game AND mute audio before ad */
+            console.log('[AndroidBridge] Requesting Interstitial');
             _pauseGame();
             _muteAudio();
             this.interstitialState = 'loading';
             _advEmitter.emit('interstitial_state_changed', 'loading');
-            GamePix.interstitialAd().then(function(res) {
-                window.bridge.advertisement.interstitialState = 'closed';
-                _advEmitter.emit('interstitial_state_changed', 'closed');
-                /* Resume game AND unmute audio after ad */
-                _resumeGame();
-                _unmuteAudio();
-            }).catch(function() {
-                window.bridge.advertisement.interstitialState = 'failed';
-                _advEmitter.emit('interstitial_state_changed', 'failed');
-                _resumeGame();
-                _unmuteAudio();
-            });
+            if (!_callNative('showInterstitialAd')) {
+                window.onInterstitialAdFailed();
+            }
         },
         showRewarded: function(placement) {
-            if (!window.GamePix) return;
-            console.log("GamePix Adapter: Requesting Rewarded Ad, placement:", placement);
-            /* Pause game AND mute audio before rewarded ad */
+            console.log('[AndroidBridge] Requesting Rewarded Ad, placement:', placement);
             _pauseGame();
             _muteAudio();
             this.rewardedState = 'loading';
             _advEmitter.emit('rewarded_state_changed', 'loading');
-            var rewardPromise = placement ? GamePix.rewardAd(placement) : GamePix.rewardAd();
-            rewardPromise.then(function(res) {
-                /* Unmute audio after rewarded ad regardless of outcome */
-                _unmuteAudio();
-                _resumeGame();
-                if (res && res.success) {
-                    window.bridge.advertisement.rewardedState = 'rewarded';
-                    _advEmitter.emit('rewarded_state_changed', 'rewarded');
-                } else {
-                    window.bridge.advertisement.rewardedState = 'closed';
-                    _advEmitter.emit('rewarded_state_changed', 'closed');
-                }
-            }).catch(function() {
-                window.bridge.advertisement.rewardedState = 'failed';
-                _advEmitter.emit('rewarded_state_changed', 'failed');
-                _unmuteAudio();
-                _resumeGame();
-            });
+            if (!_callNative('showRewardedAd', placement || '')) {
+                window.onRewardedAdFailed();
+            }
         }
     },
     platform: {
-        id: 'gamepix',
+        id: 'android',
         get language() {
-            return (window.GamePix && GamePix.lang) ? GamePix.lang() : 'en';
+            try {
+                return (window.AndroidBridge && window.AndroidBridge.getLanguage())
+                    || navigator.language.split('-')[0]
+                    || 'en';
+            } catch(e) { return 'en'; }
         },
         payload: '',
         tld: 'com',
@@ -189,29 +208,21 @@ window.bridge = {
         isSupported: function() { return true; },
         isAvailable: function() { return true; },
         get: function(keys) {
-            if (window.GamePix && GamePix.localStorage) {
-                var results = keys.map(function(key) {
-                    return GamePix.localStorage.getItem(String(key));
-                });
-                return Promise.resolve(results);
-            }
-            return Promise.resolve(keys.map(function() { return null; }));
+            return Promise.resolve(keys.map(function(key) {
+                return localStorage.getItem(String(key));
+            }));
         },
         set: function(keys, values) {
-            if (window.GamePix && GamePix.localStorage) {
-                keys.forEach(function(key, i) {
-                    var val = (typeof values[i] === 'string') ? values[i] : JSON.stringify(values[i]);
-                    GamePix.localStorage.setItem(String(key), val);
-                });
-            }
+            keys.forEach(function(key, i) {
+                var val = (typeof values[i] === 'string') ? values[i] : JSON.stringify(values[i]);
+                localStorage.setItem(String(key), val);
+            });
             return Promise.resolve();
         },
         delete: function(keys) {
-            if (window.GamePix && GamePix.localStorage) {
-                keys.forEach(function(key) {
-                    GamePix.localStorage.removeItem(String(key));
-                });
-            }
+            keys.forEach(function(key) {
+                localStorage.removeItem(String(key));
+            });
             return Promise.resolve();
         }
     },
@@ -230,11 +241,6 @@ window.bridge = {
     }
 };
 
-window.happyMoment = function() {
-    if (window.GamePix) GamePix.happyMoment();
-};
-
-var _origAlert = window.alert;
 window.alert = function(msg) {
     var banner = document.getElementById('error-banner');
     if (banner) {
