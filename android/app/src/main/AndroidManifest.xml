@@ -15,6 +15,11 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-1078340192803579~4953949949" />
 
+        <!-- Privacy Policy -->
+        <meta-data
+            android:name="privacy_policy_url"
+            android:value="https://lin480-arch.github.io" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
