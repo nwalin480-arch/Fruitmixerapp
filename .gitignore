@@ -1,0 +1,19 @@
+# Android
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Zip
+zipFile.zip
+
+# Replit
+.replit
+replit.nix
+.cache/
+.local/
+.agents/

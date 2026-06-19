@@ -1,0 +1,166 @@
+package com.fruitMixer.game
+
+import android.annotation.SuppressLint
+import android.os.Bundle
+import android.view.View
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.appcompat.app.AppCompatActivity
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var webView: WebView
+    private lateinit var bridge: AndroidBridge
+
+    private var interstitialAd: InterstitialAd? = null
+    private var rewardedAd: RewardedAd? = null
+
+    /* ── Replace with your real AdMob ad unit IDs ─────────────────────────
+       Format: ca-app-pub-XXXXXXXXXXXXXXXX/NNNNNNNNNN
+       Use test IDs below until you are ready to go live:
+         Interstitial test: ca-app-pub-3940256099942544/1033173712
+         Rewarded test:     ca-app-pub-3940256099942544/5224354917       */
+    private val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
+    private val REWARDED_AD_UNIT_ID     = "ca-app-pub-3940256099942544/5224354917"
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        )
+
+        setContentView(R.layout.activity_main)
+
+        webView = findViewById(R.id.webView)
+        bridge  = AndroidBridge(this, webView)
+
+        setupWebView()
+        MobileAds.initialize(this) { loadInterstitial(); loadRewarded() }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupWebView() {
+        webView.settings.apply {
+            javaScriptEnabled           = true
+            domStorageEnabled           = true
+            allowFileAccessFromFileURLs = true
+            allowUniversalAccessFromFileURLs = true
+            mediaPlaybackRequiresUserGesture = false
+            cacheMode                   = WebSettings.LOAD_DEFAULT
+        }
+
+        webView.webChromeClient = WebChromeClient()
+        webView.webViewClient   = WebViewClient()
+
+        webView.addJavascriptInterface(bridge, "AndroidBridge")
+
+        webView.loadUrl("file:///android_asset/game/index.html")
+    }
+
+    /* ── Interstitial ─────────────────────────────────────────────────────── */
+
+    private fun loadInterstitial() {
+        val request = AdRequest.Builder().build()
+        InterstitialAd.load(this, INTERSTITIAL_AD_UNIT_ID, request,
+            object : InterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: InterstitialAd) {
+                    interstitialAd = ad
+                    ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                        override fun onAdDismissedFullScreenContent() {
+                            interstitialAd = null
+                            loadInterstitial()
+                            bridge.callJS("onInterstitialAdClosed")
+                        }
+                        override fun onAdFailedToShowFullScreenContent(e: AdError) {
+                            interstitialAd = null
+                            loadInterstitial()
+                            bridge.callJS("onInterstitialAdFailed")
+                        }
+                    }
+                }
+                override fun onAdFailedToLoad(e: LoadAdError) {
+                    interstitialAd = null
+                }
+            })
+    }
+
+    fun showInterstitial() {
+        if (interstitialAd != null) {
+            interstitialAd!!.show(this)
+        } else {
+            bridge.callJS("onInterstitialAdFailed")
+            loadInterstitial()
+        }
+    }
+
+    /* ── Rewarded ─────────────────────────────────────────────────────────── */
+
+    private fun loadRewarded() {
+        val request = AdRequest.Builder().build()
+        RewardedAd.load(this, REWARDED_AD_UNIT_ID, request,
+            object : RewardedAdLoadCallback() {
+                override fun onAdLoaded(ad: RewardedAd) {
+                    rewardedAd = ad
+                    ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                        override fun onAdDismissedFullScreenContent() {
+                            rewardedAd = null
+                            loadRewarded()
+                            bridge.callJS("onRewardedAdClosed")
+                        }
+                        override fun onAdFailedToShowFullScreenContent(e: AdError) {
+                            rewardedAd = null
+                            loadRewarded()
+                            bridge.callJS("onRewardedAdFailed")
+                        }
+                    }
+                }
+                override fun onAdFailedToLoad(e: LoadAdError) {
+                    rewardedAd = null
+                }
+            })
+    }
+
+    fun showRewarded() {
+        if (rewardedAd != null) {
+            rewardedAd!!.show(this) {
+                bridge.callJS("onRewardedAdRewarded")
+            }
+        } else {
+            bridge.callJS("onRewardedAdFailed")
+            loadRewarded()
+        }
+    }
+
+    /* ── Lifecycle ────────────────────────────────────────────────────────── */
+
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+        webView.evaluateJavascript("window.onResumeGame && window.onResumeGame()", null)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        webView.onPause()
+        webView.evaluateJavascript("window.onPauseGame && window.onPauseGame()", null)
+    }
+
+    override fun onBackPressed() {
+        // Prevent back button from closing the game
+    }
+}
