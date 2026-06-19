@@ -18,7 +18,7 @@
         <!-- Privacy Policy -->
         <meta-data
             android:name="privacy_policy_url"
-            android:value="https://lin480-arch.github.io" />
+            android:value="https://nwalin480-arch.github.io/privacy-policy-/" />
 
         <activity
             android:name=".MainActivity"

@@ -77,7 +77,7 @@ Add these 4 secrets one by one:
 1. Go to https://developer.amazon.com/apps-and-games
 2. Create new app → Android
 3. Upload `FruitMixer-release.apk`
-4. In the Privacy Policy field, enter: **https://lin480-arch.github.io**
+4. In the Privacy Policy field, enter: **https://nwalin480-arch.github.io/privacy-policy-/**
 5. Submit for review
 
 ---
