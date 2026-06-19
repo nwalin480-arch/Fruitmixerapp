@@ -26,13 +26,9 @@ class MainActivity : AppCompatActivity() {
     private var interstitialAd: InterstitialAd? = null
     private var rewardedAd: RewardedAd? = null
 
-    /* ── Replace with your real AdMob ad unit IDs ─────────────────────────
-       Format: ca-app-pub-XXXXXXXXXXXXXXXX/NNNNNNNNNN
-       Use test IDs below until you are ready to go live:
-         Interstitial test: ca-app-pub-3940256099942544/1033173712
-         Rewarded test:     ca-app-pub-3940256099942544/5224354917       */
-    private val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
-    private val REWARDED_AD_UNIT_ID     = "ca-app-pub-3940256099942544/5224354917"
+    private val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-1078340192803579/8788600203"
+    private val REWARDED_AD_UNIT_ID     = "ca-app-pub-1078340192803579/3576902056"
+    private val BANNER_AD_UNIT_ID       = "ca-app-pub-1078340192803579/7927210609"
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
