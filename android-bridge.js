@@ -142,7 +142,7 @@ window.bridge = {
         interstitialState: 'closed',
         rewardedState: 'closed',
         minimumDelayBetweenInterstitial: 60,
-        isBannerSupported: false,
+        isBannerSupported: true,
         isInterstitialSupported: true,
         isRewardedSupported: true,
         isAdvancedBannersSupported: false,
@@ -155,8 +155,8 @@ window.bridge = {
         checkAdBlock: function() {
             return Promise.resolve(false);
         },
-        showBanner: function() {},
-        hideBanner: function() {},
+        showBanner: function() { _callNative('showBanner'); },
+        hideBanner: function() { _callNative('hideBanner'); },
         showAdvancedBanners: function() {},
         hideAdvancedBanners: function() {},
         showInterstitial: function() {
