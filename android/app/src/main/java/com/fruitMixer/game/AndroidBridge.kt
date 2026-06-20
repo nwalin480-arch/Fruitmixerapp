@@ -25,6 +25,20 @@ class AndroidBridge(
     }
 
     @JavascriptInterface
+    fun showBanner() {
+        activity.runOnUiThread {
+            activity.showBanner()
+        }
+    }
+
+    @JavascriptInterface
+    fun hideBanner() {
+        activity.runOnUiThread {
+            activity.hideBanner()
+        }
+    }
+
+    @JavascriptInterface
     fun onGameReady() {
         android.util.Log.d("AndroidBridge", "Game is ready")
     }
