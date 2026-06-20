@@ -1,14 +1,18 @@
 package com.fruitMixer.game
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.WebViewAssetLoader
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
@@ -50,9 +54,9 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        webView       = findViewById(R.id.webView)
-        bannerAdView  = findViewById(R.id.adBannerView)
-        bridge        = AndroidBridge(this, webView)
+        webView      = findViewById(R.id.webView)
+        bannerAdView = findViewById(R.id.adBannerView)
+        bridge       = AndroidBridge(this, webView)
 
         setupWebView()
         requestConsent()
@@ -62,31 +66,22 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestConsent() {
         consentInformation = UserMessagingPlatform.getConsentInformation(this)
-
         val params = ConsentRequestParameters.Builder().build()
 
         consentInformation.requestConsentInfoUpdate(this, params,
             {
                 UserMessagingPlatform.loadAndShowConsentFormIfRequired(this) { formError ->
-                    if (formError != null) {
-                        Log.e(TAG, "Consent form error: ${formError.message}")
-                    }
-                    if (consentInformation.canRequestAds()) {
-                        initAds()
-                    }
+                    if (formError != null) Log.e(TAG, "Consent form error: ${formError.message}")
+                    if (consentInformation.canRequestAds()) initAds()
                 }
             },
             { requestConsentError ->
                 Log.e(TAG, "Consent info update failed: ${requestConsentError.message}")
-                if (consentInformation.canRequestAds()) {
-                    initAds()
-                }
+                if (consentInformation.canRequestAds()) initAds()
             }
         )
 
-        if (consentInformation.canRequestAds()) {
-            initAds()
-        }
+        if (consentInformation.canRequestAds()) initAds()
     }
 
     /* ── Ads Initialization ───────────────────────────────────────────────── */
@@ -105,19 +100,30 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
+        val assetLoader = WebViewAssetLoader.Builder()
+            .setDomain("appassets.androidplatform.net")
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
         webView.settings.apply {
             javaScriptEnabled                = true
             domStorageEnabled                = true
-            allowFileAccessFromFileURLs      = true
-            allowUniversalAccessFromFileURLs = true
             mediaPlaybackRequiresUserGesture = false
             cacheMode                        = WebSettings.LOAD_DEFAULT
         }
 
         webView.webChromeClient = WebChromeClient()
-        webView.webViewClient   = WebViewClient()
+        webView.webViewClient   = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ): WebResourceResponse? {
+                return assetLoader.shouldInterceptRequest(request.url)
+            }
+        }
+
         webView.addJavascriptInterface(bridge, "AndroidBridge")
-        webView.loadUrl("file:///android_asset/game/index.html")
+        webView.loadUrl("https://appassets.androidplatform.net/assets/game/index.html")
     }
 
     /* ── Banner ───────────────────────────────────────────────────────────── */
