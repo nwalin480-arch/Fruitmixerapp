@@ -11,6 +11,7 @@ import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
@@ -27,6 +28,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var bridge: AndroidBridge
     private lateinit var consentInformation: ConsentInformation
+    private lateinit var bannerAdView: AdView
 
     private var interstitialAd: InterstitialAd? = null
     private var rewardedAd: RewardedAd? = null
@@ -34,7 +36,6 @@ class MainActivity : AppCompatActivity() {
 
     private val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-1078340192803579/8788600203"
     private val REWARDED_AD_UNIT_ID     = "ca-app-pub-1078340192803579/3576902056"
-    private val BANNER_AD_UNIT_ID       = "ca-app-pub-1078340192803579/7927210609"
     private val TAG                     = "FruitMixer"
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -49,14 +50,15 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        webView = findViewById(R.id.webView)
-        bridge  = AndroidBridge(this, webView)
+        webView       = findViewById(R.id.webView)
+        bannerAdView  = findViewById(R.id.adBannerView)
+        bridge        = AndroidBridge(this, webView)
 
         setupWebView()
         requestConsent()
     }
 
-    /* ── UMP Consent (Google's official consent form) ─────────────────────── */
+    /* ── UMP Consent ──────────────────────────────────────────────────────── */
 
     private fun requestConsent() {
         consentInformation = UserMessagingPlatform.getConsentInformation(this)
@@ -95,6 +97,7 @@ class MainActivity : AppCompatActivity() {
         MobileAds.initialize(this) {
             loadInterstitial()
             loadRewarded()
+            loadBanner()
         }
     }
 
@@ -115,6 +118,27 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient   = WebViewClient()
         webView.addJavascriptInterface(bridge, "AndroidBridge")
         webView.loadUrl("file:///android_asset/game/index.html")
+    }
+
+    /* ── Banner ───────────────────────────────────────────────────────────── */
+
+    private fun loadBanner() {
+        bannerAdView.loadAd(AdRequest.Builder().build())
+        Log.d(TAG, "Banner ad loading...")
+    }
+
+    fun showBanner() {
+        runOnUiThread {
+            bannerAdView.visibility = View.VISIBLE
+            bridge.callJS("onBannerAdShown")
+        }
+    }
+
+    fun hideBanner() {
+        runOnUiThread {
+            bannerAdView.visibility = View.GONE
+            bridge.callJS("onBannerAdHidden")
+        }
     }
 
     /* ── Interstitial ─────────────────────────────────────────────────────── */
@@ -180,13 +204,20 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        bannerAdView.resume()
         webView.evaluateJavascript("window.onResumeGame && window.onResumeGame()", null)
     }
 
     override fun onPause() {
         super.onPause()
         webView.onPause()
+        bannerAdView.pause()
         webView.evaluateJavascript("window.onPauseGame && window.onPauseGame()", null)
+    }
+
+    override fun onDestroy() {
+        bannerAdView.destroy()
+        super.onDestroy()
     }
 
     override fun onBackPressed() {}
